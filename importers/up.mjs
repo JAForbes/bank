@@ -7,50 +7,19 @@ import postgres from 'postgres'
 import dotenv from 'dotenv'
 dotenv.config()
 
-const filenames = argv._.join(' ').split(' ').filter( x => x.endsWith('.csv') )
+const filenames = argv._.filter( x => x.endsWith('.csv') )
 
 let db_rows = []
 for( let filepath of filenames ) {
-    console.log(filepath)
+    
     const contents = (await fs.readFile(filepath)).toString('utf8')
+    console.log(contents)
     const { data: rows } = papa.parse(contents, {
         dynamicTyping: false,
         header: true
     })
 
     for (let row of rows){
-        // let [
-        //     date1,
-        //     date2,
-        //     description,
-        //     blank,
-        //     amount,
-        //     balance,
-        // ] = row
-
-        // date1 = df.parse(`${date1} +10:00`, 'dd MMM yyyy XXX', new Date())
-        // date2 = df.parse(`${date2} +10:00`, 'dd MMM yyyy XXX', new Date())
-
-        // row = {date1, date2, description, blank, amount, balance}
-
-        // if (row.amount == null) continue;
-        // {
-        //     Time: '2021-01-02T05:28:17+11:00',
-        //     'BSB / Account Number': '633-123 / 165807751',
-        //     'Transaction Type': 'International Purchase',
-        //     Payee: 'Patreon',
-        //     Description: 'Patreon* Membership1, INTERNET',
-        //     Category: 'Gifts & Charity',
-        //     Tags: '',
-        //     'Subtotal (AUD)': '-7.17',
-        //     Currency: 'USD',
-        //     'Subtotal (Transaction Currency)': '-5.5',
-        //     'Fee (AUD)': '0.00',
-        //     'Round Up (AUD)': '0.00',
-        //     'Total (AUD)': '-7.17',
-        //     'Payment Method': '',
-        //     'Settled Date': '2021-01-03'
-        //   }
         if (row['Total (AUD)'] == null) continue;
 
         let {

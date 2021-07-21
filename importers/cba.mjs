@@ -8,41 +8,39 @@ import postgres from 'postgres'
 import dotenv from 'dotenv'
 dotenv.config()
 
-const filenames = argv._.filter( x => x.endsWith('.CSV') )
+const filenames = argv._.filter( x => x.endsWith('.csv') )
 
-let db_rows = []
+let transactions = []
+let accounts = []
 for( let filepath of filenames ) {
+    
     const contents = (await fs.readFile(filepath)).toString('utf8')
     const { data: rows } = papa.parse(contents, {
         dynamicTyping: false
     })
 
-    const [account_name, account_no] = path.parse(filepath).dir.split('/').reverse()
-    console.log({ account_name, account_no })
-    // continue;
+    const [account_details, account_holder] = path.parse(filepath).dir.split('/').reverse()
+    const [account_name, bsb_no, account_no] = account_details.split('-')
+
+    accounts.push({ account_no, bsb_no, account_name, account_holder })
 
     for (let row of rows){
+        
         let [
-            date1,
-            date2,
-            description,
-            blank,
+            date,
             amount,
-            balance,
+            description
         ] = row
 
-        date1 = df.parse(`${date1} +10:00`, 'dd MMM yyyy XXX', new Date())
-        date2 = date2 ? df.parse(`${date2} +10:00`, 'dd MMM yyyy XXX', new Date()) : date1
+        if (amount == null) continue;
+        
+        date = df.parse(`${date} +10:00`, 'dd/mm/yyyy XXX', new Date())
 
-        if (!amount) continue;
-        
         amount = amount.replace('.', '') // cents
-        row = {date1, date2, description, blank, amount, balance}
-        const hashContent = JSON.stringify([account_no, account_name, date1, description, amount])
         
-        let db_row = {
-            created_at: date1
-            , account_no: `${account_no}${account_name}` 
+        let transaction = {
+            created_at: date
+            , account_no: `${bsb_no} ${account_no} ${account_name}` 
             , transaction_type: null
             , payee: null
             , description
@@ -54,30 +52,38 @@ for( let filepath of filenames ) {
             , round_up: 0
             , total_aud: amount
             , payment_method: null
-            , settled_date: date2
-            
+            , settled_date: date
         }
 
-        
-        // something that is unlikely to change later, and unlikely to collide
-        db_row.hash = crypto.createHash('md5')
-            .update(hashContent)
-            .digest('hex')
-        db_rows.push(db_row)
+        transactions.push(transaction)
     }
 }
+
+console.log({ accounts })
 
 const sql = postgres(`${process.env.CLUSTER_URL}/${process.env.PGDATABASE}`, {
     max: 1
 })
 
-for( let i = 0; i < Math.ceil(65000 / db_rows.length * 20); i++ ) {
-
+for( let i = 0; i < Math.ceil(65000 / accounts.length * 4); i++ ) {
+    let subset =
+        accounts.slice(i, i+(65000 / db_rows.length * 4))
     
+    await sql`
+        insert into ${ sql(subset, 'account_no', 'bsb_no', 'account_name', 'account_holder') }
+        on conflict (account_no, bsb_no)
+        do update account_name = excluded.account_name
+            account_holder = excluded.account_holder
+    `
+}
+
+for( let i = 0; i < Math.ceil(65000 / transactions.length * 20); i++ ) {
+
+    let subset = transactions.slice(i, i+(65000 / transactions.length * 20))
     await sql`
         insert into transaction ${
             sql(
-                db_rows.slice(i, i+(65000 / db_rows.length * 20))
+                subset
                 , 'hash'
                 , 'account_no'
                 , 'transaction_type'
@@ -98,6 +104,5 @@ for( let i = 0; i < Math.ceil(65000 / db_rows.length * 20); i++ ) {
         on conflict (hash) do nothing 
     `
 }
-
 
 await sql.end()
