@@ -1,4 +1,3 @@
-#!./node_modules/.bin/zx
 import dotenv from 'dotenv'
 await dirs()
 dotenv.config()
@@ -6,7 +5,7 @@ async function dirs(){
     await $`mkdir -p data/input output/zip output/unzip`
 }
 
-async function fetchBankData(){
+export async function fetchBankData(){
     const DATA_REPO = process.env.DATA_REPO
     const GH_TOKEN = process.env.GH_TOKEN
     if( DATA_REPO ) {
@@ -14,16 +13,16 @@ async function fetchBankData(){
         await $`curl -H "Authorization: token ${GH_TOKEN}" -L https://api.github.com/repos/${DATA_REPO}/zipball > output/zip/data.zip`
         
         await $`unzip output/zip/data.zip -d output/unzip`
-        await $`mv output/unzip/*/* data/input/`
+        await $`cp -r output/unzip/*/* data/input/`
     }
 }
 
-async function migrations(){
+export async function migrations(){
     await $`psql ${process.env.CLUSTER_URL}/postgres -c "create database bank;"`.catch( () => {})
-    await $`npx pgmg ./migrations/index.mjs`
+    await $`npx pgmg ${process.env.CLUSTER_URL}/${process.env.PGDATABASE} ./migrations/*`
 }
 
-async function importers(){
+export async function importers(){
     let xs = [
         { importer: './importers/up.mjs', filepaths: (await $`find data/input/Up/*/*.csv`).stdout.trim().split('\n') },
         { importer: './importers/tmb.mjs', filepaths: (await $`find data/input/TMB/*/*/*.CSV`).stdout.trim().split('\n') }
@@ -37,15 +36,4 @@ async function importers(){
             console.error('Could not import via', importer, e)
         }
     }
-}
-
-try {
-    $.verbose = false
-    if (argv._[1]) {
-        let fn = argv._[1]+'()'
-        await eval(fn)
-    }
-} catch (e) {
-    console.error(e)
-    process.exit(1)
 }

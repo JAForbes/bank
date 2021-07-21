@@ -13,9 +13,9 @@ Bank stuff
     - `PGDATABASE` The name of your existing target database, or the database you want to be created
 
 2. Clone this repo, npm install
-3. `./run.mjs fetchBankData` to grab the data
-4. `./run.mjs migrations` to perform db setup
-5. `./run.mjs importers` to run the importers
+3. `npx zxrun fetchBankData` to grab the data
+4. `npx zxrun migrations` to perform db setup
+5. `npx zxrun importers` to run the importers
 
 You should now have a db filled with transaction data.
 
