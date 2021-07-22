@@ -7,15 +7,6 @@ export const description = `
 
 export async function transaction(sql){
     await sql`
-        alter table transaction 
-            drop column hash
-            ,
-            add constraint same_transaction unique (
-                account_no
-                , created_at
-                , subtotal_aud
-                , description
-            )
-        ;
+        alter table transaction drop column hash;
     `
 }
