@@ -19,7 +19,7 @@ export async function fetchBankData(){
 
 export async function migrations(){
     await $`psql ${process.env.CLUSTER_URL}/postgres -c "create database bank;"`.catch( () => {})
-    await $`npx pgmg ${process.env.CLUSTER_URL}/${process.env.PGDATABASE} --verbose ./migrations/*`
+    await $`npx pgmg ${process.env.CLUSTER_URL}/${process.env.PGDATABASE} ./migrations/*`
 }
 
 export async function importers(){

@@ -1,4 +1,4 @@
-export const name = 'Transaction Daily Count' + Math.random()
+export const name = 'Transaction Daily Count'
 export const description = `
     Sometimes csv's from bank's do not provide enough information for us
     to guarantee two different rows aren't the same transaction.
@@ -12,54 +12,7 @@ export const description = `
     we can tell they aren't duplicated because one was the 5th transaction that day, and another was the 11th.
 `
 
-// todo-james add to pgmg
-function triggerChange(sql, { table, column, expression, security='invoker' }){
-    let TG_NAME = `${table}_${column}`
-    let FN_NAME = `${table}_${column}`
-    sql = String.raw
-
-    const out = sql`
-        create or replace function ${FN_NAME}() returns trigger as $$
-        begin
-            ${expression};
-            return NEW
-        end;
-        $$ language plpgsql security ${security} set search_path = ''
-
-        create trigger ${TG_NAME}_update
-        before update on ${table}
-        for each row
-        execute function ${FN_NAME}();
-
-        create trigger ${TG_NAME}_insert
-        before insert on ${table}
-        for each row
-        execute function ${FN_NAME}();
-    `
-
-    return out
-}
-
-export async function transaction(sql){
-
-    console.log(
-        triggerChange(sql, { 
-            table: 'transaction', 
-            column: 'created_at', 
-            expression: 'NEW.created_on = date(NEW.created_at)' 
-        })
-    )
-
-    throw new Error('Rollback')
-}
-
-export async function transaction(SQL){
-    // todo-james add to pgmg
-    function raw(strings, ...values){
-        return SQL.unsafe(strings.map( (x,i) => x + values[i] ))
-    }
-
-    let sql = raw
+export async function transaction({ raw: sql }){
 
     await sql`
         alter table transaction 
@@ -71,12 +24,12 @@ export async function transaction(SQL){
         update transaction set created_on = date(created_at);
 
         ${
-            triggerChange({ 
+            false && sql.pgmg.triggerChange(sql, { 
                 table: 'transaction', 
                 column: 'created_at', 
                 expression: 'NEW.created_on = date(NEW.created_at)' 
             })
-        })
+        }
 
         with xs as (
             select 

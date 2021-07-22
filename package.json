@@ -13,6 +13,10 @@
     "date-fns": "^2.22.1",
     "dotenv": "^10.0.0",
     "papaparse": "^5.3.1",
+    "pgmg": "0.0.6",
     "postgres": "^1.0.2"
+  },
+  "devDependencies": {
+    "zxrun": "0.0.3"
   }
 }
