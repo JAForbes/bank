@@ -27,7 +27,6 @@ You should now have a db filled with transaction data.
 psql "$CLUSTER_URL/$PGDATABASE" -c "select count(*) from transaction"
 ```
 
-
 ## What
 
 Some scripts to load various bank csv's into a shared postgres schema.
@@ -77,6 +76,98 @@ data/input/
 ```
 
 You can probably see I'm trying to encode missing data in the file structure.  Unfortunately the csv's don't offer much beyond transactions and dates.  So it's either file structure, or config file, or UI, or something else.  Right now its file structure, but that has its limits.
+
+## Schema
+
+## bank
+
+A simple table that helps segregate data by bank.  Note this represents the organization, not a specific branch.
+
+```
+                      Table "public.bank"
+   Column    | Type | Collation | Nullable |      Default      
+-------------+------+-----------+----------+-------------------
+ bank_id     | uuid |           | not null | gen_random_uuid()
+ name        | text |           | not null | 
+ description | text |           | not null | ''::text
+Indexes:
+    "bank_pkey" PRIMARY KEY, btree (bank_id)
+    "bank_name_key" UNIQUE CONSTRAINT, btree (name)
+Referenced by:
+    TABLE "account" CONSTRAINT "account_bank_id_fkey" FOREIGN KEY (bank_id) REFERENCES bank(bank_id)
+    TABLE "transaction" CONSTRAINT "transaction_bank_id_fkey" FOREIGN KEY (bank_id) REFERENCES bank(bank_id)
+
+```
+
+## account
+
+Represents a bank account.  
+
+Transaction joins onto this table via the account_no and bank_id as the account_no will usually be in the data, and there aren't so many banks that querying them at the start of an import would be expensive.
+
+```
+                                Table "public.account"
+     Column     |           Type           | Collation | Nullable |      Default      
+----------------+--------------------------+-----------+----------+-------------------
+ account_id     | uuid                     |           | not null | gen_random_uuid()
+ account_no     | text                     |           | not null | 
+ account_name   | text                     |           |          | 
+ account_holder | text                     |           |          | 
+ created_at     | timestamp with time zone |           | not null | now()
+ bank_id        | uuid                     |           | not null | 
+Indexes:
+    "account_pkey" PRIMARY KEY, btree (account_id)
+    "unique_account" UNIQUE CONSTRAINT, btree (bank_id, account_no)
+Foreign-key constraints:
+    "account_bank_id_fkey" FOREIGN KEY (bank_id) REFERENCES bank(bank_id)
+Referenced by:
+    TABLE "transaction" CONSTRAINT "fk_account" FOREIGN KEY (bank_id, account_no) REFERENCES account(bank_id, account_no) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+```
+
+## Transaction
+
+Represents a financial transaction.  Modelled closely from the Up CSV export format (because it is excellent).
+
+This format is largely a goal for other formats to aspire to, most csv's do not include categories, transaction_types, payee's etc.
+
+The goal is to enrich those other formats by analyzing the amount+description per bank to propagate those other columns.
+
+Eventually, hopefully making all columns not null.
+
+```
+
+                               Table "public.transaction"
+      Column      |           Type           | Collation | Nullable |      Default      
+------------------+--------------------------+-----------+----------+-------------------
+ transaction_id   | uuid                     |           | not null | gen_random_uuid()
+ account_no       | text                     |           | not null | 
+ transaction_type | text                     |           |          | 
+ payee            | text                     |           |          | 
+ description      | text                     |           | not null | 
+ category         | text                     |           |          | 
+ created_at       | timestamp with time zone |           | not null | 
+ tags             | text                     |           | not null | 
+ subtotal_aud     | bigint                   |           | not null | 
+ currency         | text                     |           | not null | 
+ fee_aud          | bigint                   |           | not null | 
+ round_up         | bigint                   |           | not null | 
+ total_aud        | bigint                   |           | not null | 
+ payment_method   | text                     |           |          | 
+ settled_date     | date                     |           | not null | 
+ day_order        | integer                  |           | not null | 
+ created_on       | date                     |           | not null | 
+ bank_id          | uuid                     |           | not null | 
+Indexes:
+    "transaction_pkey" PRIMARY KEY, btree (transaction_id)
+    "unique_transaction" UNIQUE CONSTRAINT, btree (bank_id, account_no, created_on, day_order, subtotal_aud, description)
+Foreign-key constraints:
+    "fk_account" FOREIGN KEY (bank_id, account_no) REFERENCES account(bank_id, account_no) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+    "transaction_bank_id_fkey" FOREIGN KEY (bank_id) REFERENCES bank(bank_id)
+Triggers:
+    transaction_created_at_insert BEFORE INSERT ON transaction FOR EACH ROW EXECUTE FUNCTION transaction_created_at()
+    transaction_created_at_update BEFORE UPDATE ON transaction FOR EACH ROW EXECUTE FUNCTION transaction_created_at()
+
+```
 
 ## FAQ
 
