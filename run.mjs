@@ -24,8 +24,8 @@ export async function migrations(){
 
 export async function importers(){
     let xs = [
-        // { importer: './importers/up.mjs', filepaths: (await nothrow($`find data/input/Up/*/*.csv`)).stdout.trim().split('\n') },
-        // { importer: './importers/tmb.mjs', filepaths: (await nothrow($`find data/input/TMB/*/*/*.CSV`)).stdout.trim().split('\n') },
+        { importer: './importers/up.mjs', filepaths: (await nothrow($`find data/input/Up/*/*.csv`)).stdout.trim().split('\n') },
+        { importer: './importers/tmb.mjs', filepaths: (await nothrow($`find data/input/TMB/*/*/*.CSV`)).stdout.trim().split('\n') },
         { importer: './importers/cba.mjs', filepaths: (await nothrow($`find data/input/CBA/*/*/*.csv`)).stdout.trim().split('\n') }
     ]
 
