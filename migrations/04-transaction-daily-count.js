@@ -24,10 +24,10 @@ export async function transaction({ raw: sql }){
         update transaction set created_on = date(created_at);
 
         ${
-            false && sql.pgmg.triggerChange(sql, { 
-                table: 'transaction', 
-                column: 'created_at', 
-                expression: 'NEW.created_on = date(NEW.created_at)' 
+            sql.pgmg.triggerChange(sql, { 
+                table: 'transaction' 
+                ,column: 'created_at' 
+                ,expression: 'NEW.created_on = date(NEW.created_at)' 
             })
         }
 

@@ -8,11 +8,10 @@ export async function transaction(sql){
         create table account(
             account_id uuid primary key default public.gen_random_uuid()
             , account_no text not null
-            , bsb_no text not null
             , account_name text null
             , account_holder text null
-            , created_at timestamptz not null
-            , UNIQUE (account_no, bsb_no)
+            , created_at timestamptz not null default now()
+            , constraint unique_account UNIQUE (bank_id, account_no)
         );
     `
 }

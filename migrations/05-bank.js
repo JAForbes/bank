@@ -29,14 +29,20 @@ export async function transaction({ raw: sql }){
             , ('TMB', 'Teachers Mutual Bank')
         ;
 
-
         alter table transaction 
             add column bank_id uuid null references bank(bank_id)
         ;
-
+        
         alter table account
             add column bank_id uuid null references bank(bank_id)
         ;
+
+        -- ensure accounts exist for all bank/account_no combos on transaction
+        insert into account(bank_id, account_no) 
+        select distinct bank_id, account_no from transaction;
+
+        alter table account
+            alter column bank_id set not null;
 
         update transaction set bank_id = 
         case 
@@ -57,13 +63,18 @@ export async function transaction({ raw: sql }){
         alter table transaction 
             add constraint unique_transaction unique ( 
                 bank_id
-                , account_no
+                , account_id
                 , created_on
                 , day_order 
                 , subtotal_aud
                 , description
             )
         ;
-
+    
+        alter table transaction 
+        add constraint fk_account
+            foreign key (bank_id, account_no) references account(bank_id, account_no) 
+            on delete cascade deferrable initially deferred
+        ;
     `
 }
