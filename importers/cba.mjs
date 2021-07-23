@@ -17,7 +17,7 @@ const [{bank_id}] = await sql`select bank_id from bank where name = 'CBA'`
 
 const filenames = argv._.filter( x => x.endsWith('.csv') )
 let transactions = []
-let accounts = []
+let accounts = new Set()
 for( let filepath of filenames ) {
     
     const contents = (await fs.readFile(filepath)).toString('utf8') 
@@ -29,8 +29,9 @@ for( let filepath of filenames ) {
     let [account_name, bsb_no, account_no] = account_details.split('-')
 
     account_no = `${bsb_no} / ${account_no}`
-    accounts.push({ account_no, account_name, account_holder, bank_id })
-
+    accounts.add(
+        JSON.stringify({ account_no, account_name, account_holder, bank_id }) 
+    )
     let dateIndex = {}
     for (let row of rows){
         
@@ -77,13 +78,16 @@ for( let filepath of filenames ) {
 }
 
 await sql.begin( async sql => {
+    
+    accounts = [...accounts]
+    accounts = accounts.map(JSON.parse)
 
     for( let i = 0; i < Math.ceil(65000 / accounts.length * 4); i++ ) {
         let subset =
             accounts.slice(i, i+65000 / accounts.length * 4)
      
         if( !subset.length ) break;
-        console.log(subset.length)
+        
         try {
             await sql`
                 insert into account ${ sql(subset, 'bank_id', 'account_no', 'account_name', 'account_holder') }
@@ -106,7 +110,7 @@ await sql.begin( async sql => {
         let subset = transactions.slice(i, i+65000 / transactions.length * 20)
 
         if( !subset.length ) break;
-        console.log(subset.length)
+
         await sql`
             insert into transaction ${
                 sql(
@@ -141,8 +145,6 @@ await sql.begin( async sql => {
 
         i = i+65000 / transactions.length * 20
     }
-
-    // throw new Error('Rollback')
 })
 
 

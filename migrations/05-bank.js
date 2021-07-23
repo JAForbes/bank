@@ -74,7 +74,7 @@ export async function transaction({ raw: sql }){
         alter table transaction 
         add constraint fk_account
             foreign key (bank_id, account_no) references account(bank_id, account_no) 
-            on delete cascade deferrable initially deferred
+            on delete cascade on update cascade deferrable initially deferred
         ;
     `
 }
