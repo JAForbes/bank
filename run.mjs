@@ -24,16 +24,18 @@ export async function migrations(){
 
 export async function importers(){
     let xs = [
-        { importer: './importers/up.mjs', filepaths: (await $`find data/input/Up/*/*.csv`).stdout.trim().split('\n') },
-        { importer: './importers/tmb.mjs', filepaths: (await $`find data/input/TMB/*/*/*.CSV`).stdout.trim().split('\n') }
+        { importer: './importers/up.mjs', filepaths: (await nothrow($`find data/input/Up/*/*.csv`)).stdout.trim().split('\n') },
+        { importer: './importers/tmb.mjs', filepaths: (await nothrow($`find data/input/TMB/*/*/*.CSV`)).stdout.trim().split('\n') },
+        { importer: './importers/cba.mjs', filepaths: (await nothrow($`find data/input/CBA/*/*/*.csv`)).stdout.trim().split('\n') }
     ]
 
     $.verbose = true
     for( let { importer, filepaths } of xs ) {
         try {
-            await $`$(npm bin)/zx ${importer} ${filepaths.join(' ')}`
+            await $`npx zx ${importer} ${filepaths.join(' ')}`
         } catch (e) {
             console.error('Could not import via', importer, e)
+            throw e
         }
     }
 }

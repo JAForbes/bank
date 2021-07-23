@@ -13,55 +13,50 @@ const sql = postgres(`${process.env.CLUSTER_URL}/${process.env.PGDATABASE}`, {
     max: 1
 })
 
-const [{bank_id}] = await sql`select bank_id from bank where name = 'TMB'`
+const [{bank_id}] = await sql`select bank_id from bank where name = 'CBA'`
 
-const filenames = argv._.filter( x => x.endsWith('.CSV') )
+const filenames = argv._.filter( x => x.endsWith('.csv') )
 let transactions = []
 let accounts = new Set()
-
 for( let filepath of filenames ) {
-
-    const contents = (await fs.readFile(filepath)).toString('utf8')
+    
+    const contents = (await fs.readFile(filepath)).toString('utf8') 
     const { data: rows } = papa.parse(contents, {
         dynamicTyping: false
     })
 
-    let [account_type, account_no] = path.parse(filepath).dir.split('/').reverse()
-    
-    
-    account_no = `812-170 / ${account_no}${account_type}`
-    
-    accounts.add(
-        JSON.stringify({ account_no, bank_id }) 
-    )
+    const [account_details, account_holder] = path.parse(filepath).dir.split('/').reverse()
+    let [account_name, bsb_no, account_no] = account_details.split('-')
 
+    account_no = `${bsb_no} / ${account_no}`
+    accounts.add(
+        JSON.stringify({ account_no, account_name, account_holder, bank_id }) 
+    )
     let dateIndex = {}
     for (let row of rows){
+        
         let [
-            date1,
-            date2,
-            description,
-            ,
-            amount
+            date,
+            amount,
+            description
         ] = row
-        
-        if (!amount) continue;
 
-        date1 = df.parse(`${date1} ${TZ}`, 'dd MMM yyyy XXX', new Date())
-        date2 = date2 ? df.parse(`${date2} ${TZ}`, 'dd MMM yyyy XXX', new Date()) : date1
-        
-        let dateKey = [date1.getDate(),date1.getMonth(),date1.getFullYear()].join('/')
+        if (amount == null) continue;
+               
+        date = df.parse(`${date} ${TZ}`, 'dd/mm/yyyy XXX', new Date())
+
+        let dateKey = [date.getDate(),date.getMonth(),date.getFullYear()].join('/')
 
         if(!(dateKey in dateIndex)){
             dateIndex[dateKey]=0
         } 
         dateIndex[dateKey]++
-        
+
         amount = amount.replace('.', '') // cents
         
         let transaction = {
-            created_at: date1
-            , account_no: `${account_no}` 
+            created_at: date
+            , account_no
             , transaction_type: null
             , payee: null
             , description
@@ -73,17 +68,17 @@ for( let filepath of filenames ) {
             , round_up: 0
             , total_aud: amount
             , payment_method: null
-            , settled_date: date2
+            , settled_date: date
             , day_order: dateIndex[dateKey]
             , bank_id
         }
-        
+
         transactions.push(transaction)
     }
 }
 
 await sql.begin( async sql => {
-
+    
     accounts = [...accounts]
     accounts = accounts.map(JSON.parse)
 
@@ -151,5 +146,6 @@ await sql.begin( async sql => {
         i = i+65000 / transactions.length * 20
     }
 })
+
 
 await sql.end()

@@ -1,0 +1,9 @@
+{
+    "globals": {
+        "argv": true,
+        "process": true,
+        "fs": true,
+        "console": true,
+        "chalk": true
+    }
+}

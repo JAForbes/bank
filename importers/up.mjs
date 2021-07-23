@@ -1,56 +1,46 @@
 #!./node_modules/.bin/zx
 import papa from 'papaparse'
-import * as df from 'date-fns'
-import crypto from 'crypto'
 import postgres from 'postgres'
+import path from 'path'
 
 import dotenv from 'dotenv'
 dotenv.config()
 
-const filenames = argv._.join(' ').split(' ').filter( x => x.endsWith('.csv') )
+const sql = postgres(`${process.env.CLUSTER_URL}/${process.env.PGDATABASE}`, {
+    max: 1
+})
 
-let db_rows = []
+const [{bank_id}] = await sql`select bank_id from bank where name = 'Up'`
+
+const filenames = argv._.filter( x => x.endsWith('.csv') )
+let transactions = []
+let accounts = new Set()
 for( let filepath of filenames ) {
-    console.log(filepath)
+    
     const contents = (await fs.readFile(filepath)).toString('utf8')
+
     const { data: rows } = papa.parse(contents, {
-        dynamicTyping: false,
-        header: true
+        dynamicTyping: false
+        ,header: true
     })
 
+    let account_no;
+    // For up, we assume accounts are segretated files because the upname is not in the csv file
+    // just the account no, and having the upname is great
+    if( rows.length){
+        const [account_name] = path.parse(filepath).dir.split('/').reverse()
+        const account_holder = account_name
+        account_no = rows[0]['BSB / Account Number']
+
+        accounts.add(
+            JSON.stringify({ 
+                account_no, account_name, account_holder, bank_id 
+            }) 
+        )
+    }
+
+    let dateIndex = {}
     for (let row of rows){
-        // let [
-        //     date1,
-        //     date2,
-        //     description,
-        //     blank,
-        //     amount,
-        //     balance,
-        // ] = row
-
-        // date1 = df.parse(`${date1} +10:00`, 'dd MMM yyyy XXX', new Date())
-        // date2 = df.parse(`${date2} +10:00`, 'dd MMM yyyy XXX', new Date())
-
-        // row = {date1, date2, description, blank, amount, balance}
-
-        // if (row.amount == null) continue;
-        // {
-        //     Time: '2021-01-02T05:28:17+11:00',
-        //     'BSB / Account Number': '633-123 / 165807751',
-        //     'Transaction Type': 'International Purchase',
-        //     Payee: 'Patreon',
-        //     Description: 'Patreon* Membership1, INTERNET',
-        //     Category: 'Gifts & Charity',
-        //     Tags: '',
-        //     'Subtotal (AUD)': '-7.17',
-        //     Currency: 'USD',
-        //     'Subtotal (Transaction Currency)': '-5.5',
-        //     'Fee (AUD)': '0.00',
-        //     'Round Up (AUD)': '0.00',
-        //     'Total (AUD)': '-7.17',
-        //     'Payment Method': '',
-        //     'Settled Date': '2021-01-03'
-        //   }
         if (row['Total (AUD)'] == null) continue;
 
         let {
@@ -70,7 +60,15 @@ for( let filepath of filenames ) {
             'Settled Date': settled_date
         } = row
 
-        let db_row = {
+        let date = new Date(created_at)
+        let dateKey = [date.getDate(),date.getMonth(),date.getFullYear()].join('/')
+
+        if(!(dateKey in dateIndex)){
+            dateIndex[dateKey]=0
+        } 
+        dateIndex[dateKey]++
+
+        let transaction = {
             created_at
             , account_no
             , transaction_type
@@ -85,54 +83,88 @@ for( let filepath of filenames ) {
             , total_aud: total_aud.replace('.', '')
             , payment_method
             , settled_date
+            , day_order:dateIndex[dateKey]
+            , bank_id
         }
 
-        // something that is unlikely to change later, and unlikely to collide
-        db_row.hash = 
-            crypto.createHash('md5')
-                .update(
-                    JSON.stringify([created_at,account_no,payee,currency,subtotal_aud])
-                )
-                .digest('hex')
-            
-
-        db_row.category = db_row.category == '' ? null : db_row.category
-        db_row.payment_method = db_row.payment_method == '' ? null : db_row.payment_method
-        db_rows.push(db_row)
+        transaction.category = transaction.category == '' ? null : transaction.category
+        transaction.payment_method = transaction.payment_method == '' ? null : transaction.payment_method
+        transactions.push(transaction)
     }
 }
 
-const sql = postgres(`${process.env.CLUSTER_URL}/${process.env.PGDATABASE}`, {
-    max: 1
-})
-
-for( let i = 0; i < Math.ceil(65000 / db_rows.length * 20); i++ ) {
-
+await sql.begin( async sql => {
     
-    await sql`
-        insert into transaction ${
-            sql(
-                db_rows.slice(i, i+(65000 / db_rows.length * 20))
-                , 'hash'
-                , 'account_no'
-                , 'transaction_type'
-                , 'payee'
-                , 'description'
-                , 'category'
-                , 'created_at'
-                , 'tags'
-                , 'subtotal_aud'
-                , 'currency'
-                , 'fee_aud'
-                , 'round_up'
-                , 'total_aud'
-                , 'payment_method'
-                , 'settled_date'
-            )
+    accounts = [...accounts]
+    accounts = accounts.map(JSON.parse)
+
+    for( let i = 0; i < Math.ceil(65000 / accounts.length * 4); i++ ) {
+        let subset =
+            accounts.slice(i, i+65000 / accounts.length * 4)
+     
+        if( !subset.length ) break;
+        
+        try {
+            await sql`
+                insert into account ${ sql(subset, 'bank_id', 'account_no', 'account_name', 'account_holder') }
+                on conflict (bank_id, account_no) 
+                do update set 
+                    account_name = coalesce(excluded.account_name, account.account_name)
+                    ,
+                    account_holder = coalesce(excluded.account_holder, account.account_holder)
+            `
+        } catch (e) {
+            console.log(e)
+            throw e
         }
-        on conflict (hash) do nothing 
-    `
-}
+
+        i = i+65000 / transactions.length * 20
+    }
+    
+    for( let i = 0; i < Math.ceil(65000 / transactions.length * 20); i++ ) {
+    
+        let subset = transactions.slice(i, i+65000 / transactions.length * 20)
+
+        if( !subset.length ) break;
+
+        await sql`
+            insert into transaction ${
+                sql(
+                    subset
+                    , 'account_no'
+                    , 'transaction_type'
+                    , 'payee'
+                    , 'description'
+                    , 'category'
+                    , 'created_at'
+                    , 'tags'
+                    , 'subtotal_aud'
+                    , 'currency'
+                    , 'fee_aud'
+                    , 'round_up'
+                    , 'total_aud'
+                    , 'payment_method'
+                    , 'settled_date'
+                    , 'day_order'
+                    , 'bank_id'
+                )
+            }
+            on conflict ( 
+                bank_id
+                , account_no
+                , created_on
+                , day_order 
+                , subtotal_aud
+                , description
+            ) do nothing 
+        `
+
+        i = i+65000 / transactions.length * 20
+    }
+
+    console.log('accounts', accounts.length)
+    console.log('transactions', transactions.length)
+})
 
 
 await sql.end()
