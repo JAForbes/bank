@@ -35,6 +35,7 @@ export async function importers(){
             await $`npx zx ${importer} ${filepaths.join(' ')}`
         } catch (e) {
             console.error('Could not import via', importer, e)
+            throw e
         }
     }
 }
