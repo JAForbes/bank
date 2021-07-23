@@ -1,6 +1,8 @@
 # bank
 
-Bank stuff
+Import various transaction formats into a nice structured postgres database.
+
+> 🚨🚨 Do not use this, I am just fooling around here.  🚨🚨
 
 ## Quick Start
 
@@ -38,11 +40,15 @@ It is good to be able to easily introspect your finances.
 
 ## Who can use this?
 
-Anyone who uses Teachers Mutual Bank or Up.  I'm likely to add CBA near term because I have CBA accounts.  It is fairly simple to add other importers and I'm open to it if anyone wants to make a PR.
+First of all, don't use this.  It's highly experimental and likely won't work for you yet.
+
+But ... hypothetically - anyone who uses Teachers Mutual Bank, Up or CBA.
+
+Right now the importers are deliberately messy and duplicated because I'm trying to see the exact right abstraction boundary.  But soon it will stabilize and I'll accept PRs for other formats.
 
 ## What's on the roadmap?
 
-Honestly who knows.  This is a first step.  But I'd like to have a basic dash that shows me how much I'm spending in various categories and to be able to easily query my financials remotely.  But I may just keep this as an import repo, and then from there, there's open source Airtable alternatives that can connect straight to postgres, so that may be the endgame.
+Honestly who knows.  Right now I am just focused on importing data.  Initially this was just for me, but now I'm considering multi tenancy, so that's probably next.
 
 ## Directory Structure
 
@@ -55,35 +61,24 @@ data/input/
     ├── TMB
     │   └── <ACCOUNT NO>
     │       └── <ACCOUNT_NAME>
-    │           ├── FYXXXX.CSV
+    │           ├── *.CSV
     └── Up
-        ├── 2Up
-        │   ├── YYYY-MM.csv
-        ├── <upname>
-        │   ├── YYYY-MM.csv
-        └── <upname>
-            ├── YYYY-MM.csv
+    |   ├── <upname>
+    |   │   ├── *.csv
+    |   ├── <upname>
+    |   │   ├── *.csv
+    |   └── <upname>
+    |       ├── *.csv
+    └── CBA
+        ├── <Account Holder>
+            ├── <Account Name-BSB-ACCOUNT_NO>
+                ├── *.csv
+
 ```
 
-When a new banking provider is supported, the structure will be fairly similar.  E.g. if CBA was added it might look like this:
-
-
-```
-# tree data/input 
-data/input/
-└── Bank
-    ├── CBA
-    │   └── <BSB + Account No>
-    │       └── <Account Type (e.g. Credit Card)>
-    │           ├── YYYY-MM.CSV
-    
-```
+You can probably see I'm trying to encode missing data in the file structure.  Unfortunately the csv's don't offer much beyond transactions and dates.  So it's either file structure, or config file, or UI, or something else.  Right now its file structure, but that has its limits.
 
 ## FAQ
-
-### Why does TMB use the FYYYY.csv naming convention?
-
-I don't use TMB very often, so I name it that way because I am grabbing entire years just to have historical data.  But it is just the standard TMB format.  And the name of the file isn't actually import, we just can for CSV files. 
 
 ### What is day_order in the schema?
 
