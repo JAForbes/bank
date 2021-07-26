@@ -377,7 +377,7 @@ export async function always(sql){
             for(let sequence of knownAppTypes.map( x => ` ${x} BPAY `)) {
                 let i = description.indexOf(sequence)
                 if ( i > -1 ) {
-                    app = sequence.slice(1, -(' BPAY').length-1)
+                    app = sequence.slice(1, -' BPAY'.length-1)
                     
                     payee = description.slice(0, i)
                     description = description.slice(i+sequence.length)
