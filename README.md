@@ -169,7 +169,21 @@ Triggers:
 
 ```
 
+### Data Enrichment
+
+For now, data enrichment is via plpgsql manual pattern matching hand crafted for each bank.  My expectation is after doing this for a few different banks particular techniques and patterns will emerge and while there will still be separate enrichment functions they will probably share some code.
+
+Once there is a significant sample of enriched and unenriched data we may pivot to using machine learning to enrich data, but we'll use the manually enriched as both a baseline and a fallback until the machine learning approach accuracy is beyond question.
+
 ## FAQ
+
+### Why is the data enrichment done in the database instead of on import?
+
+I expect the enrichment will change all the time, it will need to be updated to account for new types of transactions we haven't seen before.
+Or there have been rows we'd already imported we thought was free text but actually had a recognizable format once we've got a large enough sample.
+Having the enrichment in the database allows us to re-enrich data that is already imported, and guarantee via triggers that all data in the database has passed through the enrichment layer even if data is manually entered via a UI, psql or an unofficial script.
+
+Also having it in the database as plpgsql functions allows me to dogfood [pgmg](https://github.com/JAForbes/pgmg) plpgsql migration utilities in a fairly safe context that currently won't impact anyone in production.
 
 ### What is day_order in the schema?
 
