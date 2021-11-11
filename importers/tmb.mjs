@@ -32,7 +32,9 @@ for( let filepath of filenames ) {
     account_no = `812-170 / ${account_no}${account_type}`
     
     accounts.add(
-        JSON.stringify({ account_no, bank_id }) 
+        JSON.stringify({ 
+            account_no, bank_id, account_name: null, account_holder: null 
+        }) 
     )
 
     let dateIndex = {}
