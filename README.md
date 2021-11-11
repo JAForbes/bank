@@ -8,7 +8,6 @@ Import various transaction formats into a nice structured postgres database.
 
 1. You need an env file with the following:
 
-    - `GH_TOKEN=...` Allows downloading zip archive of repo
     - `DATA_REPO=USERNAME/REPONAME` Allows downloading zip archive of repo
         - If there is no DATA_URL we assume the data is already downloaded
     - `CLUSTER_URL=postgres://postgres@127.0.0.1` A postgres connection string for running migration and create database statements.

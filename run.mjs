@@ -7,13 +7,10 @@ async function dirs(){
 
 export async function fetchBankData(){
     const DATA_REPO = process.env.DATA_REPO
-    const GH_TOKEN = process.env.GH_TOKEN
     if( DATA_REPO ) {
-        await $`rm -fr output/unzip/**`
-        await $`curl -H "Authorization: token ${GH_TOKEN}" -L https://api.github.com/repos/${DATA_REPO}/zipball > output/zip/data.zip`
-        
-        await $`unzip output/zip/data.zip -d output/unzip`
-        await $`cp -r output/unzip/*/* data/input/`
+        await $`rm -fr data/input`
+        await $`git clone git@github.com:${DATA_REPO}.git data/input`
+        await $`rm -fr data/input/.git`
     }
 }
 
@@ -32,7 +29,8 @@ export async function importers(){
     $.verbose = true
     for( let { importer, filepaths } of xs ) {
         try {
-            await $`npx zx ${importer} ${filepaths.join(' ')}`
+
+            await $`npx zx ${importer} ${filepaths}`
         } catch (e) {
             console.error('Could not import via', importer, e)
             throw e
