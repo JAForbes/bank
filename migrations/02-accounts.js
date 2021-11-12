@@ -11,7 +11,7 @@ export async function transaction(sql){
             , account_name text null
             , account_holder text null
             , created_at timestamptz not null default now()
-            , constraint unique_account UNIQUE (bank_id, account_no)
+            , constraint unique_account UNIQUE (account_no)
         );
     `
 }

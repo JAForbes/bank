@@ -14,6 +14,22 @@ export const description = `
 export async function always(sql){
     const [{ bank_id }] = await sql`select bank_id from bank`
 
+    // await sql`
+    //     alter table transaction
+    //         add column enriched_description text null
+    //     ;
+    // `
+
+    // await sql`
+    //     create or replace function public.enrich_cba( row public.transaction ) returns public.transaction as $$
+    //     begin
+
+    //     end;
+    //     $$ 
+    //     language plpgsql 
+    //     security definer
+    //     set search_path = ''
+    // `
     const transactions = await sql`
         select distinct description, *
         from transaction

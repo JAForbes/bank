@@ -59,11 +59,11 @@ export async function transaction({ raw: sql }){
         alter table transaction
             drop constraint ordered_day_transactions
         ;
-
+        
         alter table transaction 
             add constraint unique_transaction unique ( 
                 bank_id
-                , account_id
+                , account_no
                 , created_on
                 , day_order 
                 , subtotal_aud
@@ -71,6 +71,13 @@ export async function transaction({ raw: sql }){
             )
         ;
     
+        alter table account
+            drop constraint unique_account;
+
+        alter table account
+            add constraint unique_account unique (bank_id, account_no)
+        ;
+
         alter table transaction 
         add constraint fk_account
             foreign key (bank_id, account_no) references account(bank_id, account_no) 
