@@ -32,7 +32,9 @@ for( let filepath of filenames ) {
     account_no = `812-170 / ${account_no}${account_type}`
     
     accounts.add(
-        JSON.stringify({ account_no, bank_id }) 
+        JSON.stringify({ 
+            account_no, bank_id, account_name: null, account_holder: null 
+        }) 
     )
 
     let dateIndex = {}
@@ -87,68 +89,72 @@ await sql.begin( async sql => {
     accounts = [...accounts]
     accounts = accounts.map(JSON.parse)
 
-    for( let i = 0; i < Math.ceil(65000 / accounts.length * 4); i++ ) {
-        let subset =
-            accounts.slice(i, i+65000 / accounts.length * 4)
-     
-        if( !subset.length ) break;
-        
-        try {
-            await sql`
-                insert into account ${ sql(subset, 'bank_id', 'account_no', 'account_name', 'account_holder') }
-                on conflict (bank_id, account_no) 
-                do update set 
-                    account_name = coalesce(excluded.account_name, account.account_name)
-                    ,
-                    account_holder = coalesce(excluded.account_holder, account.account_holder)
-            `
-        } catch (e) {
-            console.log(e)
-            throw e
-        }
+    {
+        let chunk = Math.ceil(65000 / accounts.length * 4)
 
-        i = i+65000 / transactions.length * 20
+        for( let i = 0; true; i+= chunk ) {
+            let subset =
+                accounts.slice(i, i+chunk)
+         
+            if( !subset.length ) break;
+            
+            try {
+                await sql`
+                    insert into account ${ sql(subset, 'bank_id', 'account_no', 'account_name', 'account_holder') }
+                    on conflict (bank_id, account_no) 
+                    do update set 
+                        account_name = coalesce(excluded.account_name, account.account_name)
+                        ,
+                        account_holder = coalesce(excluded.account_holder, account.account_holder)
+                `
+            } catch (e) {
+                console.log(e)
+                throw e
+            }
+        }
     }
     
-    for( let i = 0; i < Math.ceil(65000 / transactions.length * 20); i++ ) {
+    {
+
+        let chunk = Math.ceil(65000 / transactions.length * 20)
+        
+        for( let i = 0; true; i+= chunk ) {
+        
+            let subset = transactions.slice(i, i + chunk)
+            if( !subset.length ) break;
     
-        let subset = transactions.slice(i, i+65000 / transactions.length * 20)
-
-        if( !subset.length ) break;
-
-        await sql`
-            insert into transaction ${
-                sql(
-                    subset
-                    , 'account_no'
-                    , 'transaction_type'
-                    , 'payee'
-                    , 'description'
-                    , 'category'
-                    , 'created_at'
-                    , 'tags'
-                    , 'subtotal_aud'
-                    , 'currency'
-                    , 'fee_aud'
-                    , 'round_up'
-                    , 'total_aud'
-                    , 'payment_method'
-                    , 'settled_date'
-                    , 'day_order'
-                    , 'bank_id'
-                )
-            }
-            on conflict ( 
-                bank_id
-                , account_no
-                , created_on
-                , day_order 
-                , subtotal_aud
-                , description
-            ) do nothing 
-        `
-
-        i = i+65000 / transactions.length * 20
+            await sql`
+                insert into transaction ${
+                    sql(
+                        subset
+                        , 'account_no'
+                        , 'transaction_type'
+                        , 'payee'
+                        , 'description'
+                        , 'category'
+                        , 'created_at'
+                        , 'tags'
+                        , 'subtotal_aud'
+                        , 'currency'
+                        , 'fee_aud'
+                        , 'round_up'
+                        , 'total_aud'
+                        , 'payment_method'
+                        , 'settled_date'
+                        , 'day_order'
+                        , 'bank_id'
+                    )
+                }
+                on conflict ( 
+                    bank_id
+                    , account_no
+                    , created_on
+                    , day_order 
+                    , subtotal_aud
+                    , description
+                ) do nothing 
+            `
+        }
     }
 })
 
